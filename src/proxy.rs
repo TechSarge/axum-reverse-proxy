@@ -1,6 +1,7 @@
 use axum::body::Body;
 use http::StatusCode;
 use http_body_util::BodyExt;
+use hyper_tls::HttpsConnector;
 use hyper_util::client::legacy::{connect::HttpConnector, Client};
 use std::convert::Infallible;
 use tracing::{error, trace};
@@ -16,7 +17,7 @@ use crate::websocket;
 pub struct ReverseProxy {
     path: String,
     target: String,
-    client: Client<HttpConnector, Body>,
+    client: Client<HttpsConnector<HttpConnector>, Body>,
 }
 
 impl ReverseProxy {
@@ -45,6 +46,8 @@ impl ReverseProxy {
         connector.set_connect_timeout(Some(std::time::Duration::from_secs(10)));
         connector.set_reuse_address(true);
 
+        let connector = HttpsConnector::new_with_connector(connector);
+
         let client = Client::builder(hyper_util::rt::TokioExecutor::new())
             .pool_idle_timeout(std::time::Duration::from_secs(60))
             .pool_max_idle_per_host(32)
@@ -72,11 +75,12 @@ impl ReverseProxy {
     /// use axum_reverse_proxy::ReverseProxy;
     /// use hyper_util::client::legacy::{Client, connect::HttpConnector};
     /// use axum::body::Body;
+    /// use hyper_tls::HttpsConnector;
     /// use hyper_util::rt::TokioExecutor;
     ///
     /// let client = Client::builder(TokioExecutor::new())
     ///     .pool_idle_timeout(std::time::Duration::from_secs(120))
-    ///     .build(HttpConnector::new());
+    ///     .build(HttpsConnector::new());
     ///
     /// let proxy = ReverseProxy::new_with_client(
     ///     "/api",
@@ -84,7 +88,7 @@ impl ReverseProxy {
     ///     client,
     /// );
     /// ```
-    pub fn new_with_client<S>(path: S, target: S, client: Client<HttpConnector, Body>) -> Self
+    pub fn new_with_client<S>(path: S, target: S, client: Client<HttpsConnector<HttpConnector>, Body>) -> Self
     where
         S: Into<String>,
     {
